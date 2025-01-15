@@ -174,7 +174,7 @@ integrate into the OpenSSL error system to log error data, e.g.
     /*
      * Lookup IP address info for the server.
      */
-    if (!BIO_lookup_ex(hostname, port, BIO_LOOKUP_CLIENT, 0, SOCK_STREAM, 0,
+    if (!BIO_lookup_ex(hostname, port, BIO_LOOKUP_CLIENT, family, SOCK_STREAM, 0,
                        &res))
         return NULL;
 
@@ -212,7 +212,9 @@ See L<BIO_lookup_ex(3)>, L<BIO_socket(3)>, L<BIO_connect(3)>,
 L<BIO_closesocket(3)>, L<BIO_ADDRINFO_next(3)>, L<BIO_ADDRINFO_address(3)> and
 L<BIO_ADDRINFO_free(3)> for further information on the functions used here. In
 the above example code the B<hostname> and B<port> variables are strings, e.g.
-"www.example.com" and "443".
+"www.example.com" and "443".  Note also the use of the family variable, which
+can take the values of AF_INET or AF_INET6 based on the command line -6 option,
+to allow specific connections to an ipv4 or ipv6 enabled host.
 
 Sockets created using the methods described above will automatically be blocking
 sockets - which is exactly what we want for this example.
@@ -346,7 +348,7 @@ connection.
 To send data to the server we use the L<SSL_write_ex(3)> function and to receive
 data from the server we use the L<SSL_read_ex(3)> function. In HTTP 1.0 the
 client always writes data first. Our HTTP request will include the hostname that
-we are connecting to. For simplicitly, we write the HTTP request in three
+we are connecting to. For simplicity, we write the HTTP request in three
 chunks. First we write the start of the request. Secondly we write the hostname
 we are sending the request to. Finally we send the end of the request.
 
@@ -562,6 +564,9 @@ intermediate CAs, or the issuer is simply unrecognised).
 See L<ossl-guide-tls-client-non-block(7)> to read a tutorial on how to modify
 the client developed on this page to support a nonblocking socket.
 
+See L<ossl-guide-tls-server-block(7)> for a tutorial on how to implement a
+simple TLS server handling one client at a time over a blocking socket.
+
 See L<ossl-guide-quic-client-block(7)> to read a tutorial on how to modify the
 client developed on this page to support QUIC instead of TLS.
 
@@ -573,7 +578,7 @@ L<ossl-guide-tls-client-non-block(7)>, L<ossl-guide-quic-client-block(7)>
 
 =head1 COPYRIGHT
 
-Copyright 2023 The OpenSSL Project Authors. All Rights Reserved.
+Copyright 2023-2024 The OpenSSL Project Authors. All Rights Reserved.
 
 Licensed under the Apache License 2.0 (the "License").  You may not use
 this file except in compliance with the License.  You can obtain a copy

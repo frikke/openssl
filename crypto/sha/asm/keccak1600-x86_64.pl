@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# Copyright 2017-2020 The OpenSSL Project Authors. All Rights Reserved.
+# Copyright 2017-2024 The OpenSSL Project Authors. All Rights Reserved.
 #
 # Licensed under the Apache License 2.0 (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy
@@ -524,7 +524,7 @@ SHA3_squeeze:
 	mov	%rsi,$out
 	mov	%rdx,$len
 	mov	%rcx,$bsz
-	bt	\$0,$next
+	bt	\$0,${next}d
 	jc	.Lnext_block
 	jmp	.Loop_squeeze
 
@@ -567,6 +567,7 @@ SHA3_squeeze:
 ___
 }
 $code.=<<___;
+.section .rodata align=256
 .align	256
 	.quad	0,0,0,0,0,0,0,0
 .type	iotas,\@object

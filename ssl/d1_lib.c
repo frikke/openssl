@@ -1,5 +1,5 @@
 /*
- * Copyright 2005-2023 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2005-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -8,6 +8,7 @@
  */
 
 #include "internal/e_os.h"
+#include "internal/e_winsock.h"          /* struct timeval for DTLS_CTRL_GET_TIMEOUT */
 #include <stdio.h>
 #include <openssl/objects.h>
 #include <openssl/rand.h>
@@ -29,7 +30,7 @@ const SSL3_ENC_METHOD DTLSv1_enc_data = {
     TLS_MD_SERVER_FINISH_CONST, TLS_MD_SERVER_FINISH_CONST_SIZE,
     tls1_alert_code,
     tls1_export_keying_material,
-    SSL_ENC_FLAG_DTLS | SSL_ENC_FLAG_EXPLICIT_IV,
+    SSL_ENC_FLAG_DTLS,
     dtls1_set_handshake_header,
     dtls1_close_construct_packet,
     dtls1_handshake_write
@@ -44,7 +45,7 @@ const SSL3_ENC_METHOD DTLSv1_2_enc_data = {
     TLS_MD_SERVER_FINISH_CONST, TLS_MD_SERVER_FINISH_CONST_SIZE,
     tls1_alert_code,
     tls1_export_keying_material,
-    SSL_ENC_FLAG_DTLS | SSL_ENC_FLAG_EXPLICIT_IV | SSL_ENC_FLAG_SIGALGS
+    SSL_ENC_FLAG_DTLS | SSL_ENC_FLAG_SIGALGS
         | SSL_ENC_FLAG_SHA256_PRF | SSL_ENC_FLAG_TLS1_2_CIPHERS,
     dtls1_set_handshake_header,
     dtls1_close_construct_packet,
@@ -130,6 +131,17 @@ void dtls1_clear_sent_buffer(SSL_CONNECTION *s)
 
     while ((item = pqueue_pop(s->d1->sent_messages)) != NULL) {
         frag = (hm_fragment *)item->data;
+
+        if (frag->msg_header.is_ccs
+                && frag->msg_header.saved_retransmit_state.wrlmethod != NULL
+                && s->rlayer.wrl != frag->msg_header.saved_retransmit_state.wrl) {
+            /*
+             * If we're freeing the CCS then we're done with the old wrl and it
+             * can bee freed
+             */
+            frag->msg_header.saved_retransmit_state.wrlmethod->free(frag->msg_header.saved_retransmit_state.wrl);
+        }
+
         dtls1_hm_fragment_free(frag);
         pitem_free(item);
     }
@@ -143,15 +155,15 @@ void dtls1_free(SSL *ssl)
     if (s == NULL)
         return;
 
-    DTLS_RECORD_LAYER_free(&s->rlayer);
-
-    ssl3_free(ssl);
-
     if (s->d1 != NULL) {
         dtls1_clear_queues(s);
         pqueue_free(s->d1->buffered_messages);
         pqueue_free(s->d1->sent_messages);
     }
+
+    DTLS_RECORD_LAYER_free(&s->rlayer);
+
+    ssl3_free(ssl);
 
     OPENSSL_free(s->d1);
     s->d1 = NULL;
@@ -384,7 +396,7 @@ int dtls1_handle_timeout(SSL_CONNECTION *s)
     }
 
     if (s->d1->timer_cb != NULL)
-        s->d1->timeout_duration_us = s->d1->timer_cb(SSL_CONNECTION_GET_SSL(s),
+        s->d1->timeout_duration_us = s->d1->timer_cb(SSL_CONNECTION_GET_USER_SSL(s),
                                                      s->d1->timeout_duration_us);
     else
         dtls1_double_timeout(s);

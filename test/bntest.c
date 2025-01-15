@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2023 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -908,6 +908,14 @@ static int test_gf2m_modinv(void)
             || !TEST_ptr(b[1] = BN_new())
             || !TEST_ptr(c = BN_new())
             || !TEST_ptr(d = BN_new()))
+        goto err;
+
+    /* Test that a non-sensical, too small value causes a failure */
+    if (!TEST_true(BN_one(b[0])))
+        goto err;
+    if (!TEST_true(BN_bntest_rand(a, 512, 0, 0)))
+        goto err;
+    if (!TEST_false(BN_GF2m_mod_inv(c, a, b[0], ctx)))
         goto err;
 
     if (!(TEST_true(BN_GF2m_arr2poly(p0, b[0]))
@@ -2695,7 +2703,7 @@ static int test_not_prime(int i)
 
     for (trial = 0; trial <= 1; ++trial) {
         if (!TEST_true(BN_set_word(r, not_primes[i]))
-                || !TEST_false(BN_check_prime(r, ctx, NULL)))
+                || !TEST_int_eq(BN_check_prime(r, ctx, NULL), 0))
             goto err;
     }
 
@@ -2839,12 +2847,11 @@ static int test_gcd_prime(void)
     return st;
 }
 
-typedef struct mod_exp_test_st
-{
-  const char *base;
-  const char *exp;
-  const char *mod;
-  const char *res;
+typedef struct mod_exp_test_st {
+    const char *base;
+    const char *exp;
+    const char *mod;
+    const char *res;
 } MOD_EXP_TEST;
 
 static const MOD_EXP_TEST ModExpTests[] = {

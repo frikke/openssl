@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023 The OpenSSL Project Authors. All Rights Reserved.
+ *  Copyright 2023-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
  *  Licensed under the Apache License 2.0 (the "License").  You may not use
  *  this file except in compliance with the License.  You can obtain a copy
@@ -28,7 +28,7 @@
 
 /* Helper function to create a BIO connected to the server */
 static BIO *create_socket_bio(const char *hostname, const char *port,
-                              BIO_ADDR **peer_addr)
+                              int family, BIO_ADDR **peer_addr)
 {
     int sock = -1;
     BIO_ADDRINFO *res;
@@ -38,7 +38,7 @@ static BIO *create_socket_bio(const char *hostname, const char *port,
     /*
      * Lookup IP address info for the server.
      */
-    if (!BIO_lookup_ex(hostname, port, BIO_LOOKUP_CLIENT, 0, SOCK_DGRAM, 0,
+    if (!BIO_lookup_ex(hostname, port, BIO_LOOKUP_CLIENT, family, SOCK_DGRAM, 0,
                        &res))
         return NULL;
 
@@ -231,19 +231,29 @@ int main(int argc, char *argv[])
     unsigned char alpn[] = { 8, 'h', 't', 't', 'p', '/', '1', '.', '0' };
     const char *request_start = "GET / HTTP/1.0\r\nConnection: close\r\nHost: ";
     const char *request_end = "\r\n\r\n";
-    size_t written, readbytes;
+    size_t written, readbytes = 0;
     char buf[160];
     BIO_ADDR *peer_addr = NULL;
     int eof = 0;
     char *hostname, *port;
+    int ipv6 = 0;
+    int argnext = 1;
 
-    if (argc != 3) {
-        printf("Usage: quic-client-non-block hostname port\n");
+    if (argc < 3) {
+        printf("Usage: quic-client-non-block [-6] hostname port\n");
         goto end;
     }
 
-    hostname = argv[1];
-    port = argv[2];
+    if (!strcmp(argv[argnext], "-6")) {
+        if (argc < 4) {
+            printf("Usage: quic-client-non-block [-6] hostname port\n");
+            goto end;
+        }
+        ipv6 = 1;
+        argnext++;
+    }
+    hostname = argv[argnext++];
+    port = argv[argnext];
 
     /*
      * Create an SSL_CTX which we can use to create SSL objects from. We
@@ -280,7 +290,8 @@ int main(int argc, char *argv[])
      * Create the underlying transport socket/BIO and associate it with the
      * connection.
      */
-    bio = create_socket_bio(hostname, port, &peer_addr);
+    bio = create_socket_bio(hostname, port, ipv6 ? AF_INET6 : AF_INET,
+                            &peer_addr);
     if (bio == NULL) {
         printf("Failed to crete the BIO\n");
         goto end;

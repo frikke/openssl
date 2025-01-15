@@ -99,8 +99,10 @@ static int rsa_cms_decrypt(CMS_RecipientInfo *ri)
     if (EVP_PKEY_CTX_set_rsa_mgf1_md(pkctx, mgf1md) <= 0)
         goto err;
     if (label != NULL
-            && EVP_PKEY_CTX_set0_rsa_oaep_label(pkctx, label, labellen) <= 0)
+            && EVP_PKEY_CTX_set0_rsa_oaep_label(pkctx, label, labellen) <= 0) {
+        OPENSSL_free(label);
         goto err;
+    }
     /* Carry on */
     rv = 1;
 
@@ -220,7 +222,10 @@ static int rsa_cms_sign(CMS_SignerInfo *si)
         os = ossl_rsa_ctx_to_pss_string(pkctx);
         if (os == NULL)
             return 0;
-        return X509_ALGOR_set0(alg, OBJ_nid2obj(EVP_PKEY_RSA_PSS), V_ASN1_SEQUENCE, os);
+        if (X509_ALGOR_set0(alg, OBJ_nid2obj(EVP_PKEY_RSA_PSS), V_ASN1_SEQUENCE, os))
+            return 1;
+        ASN1_STRING_free(os);
+        return 0;
     }
 
     params[0] = OSSL_PARAM_construct_octet_string(

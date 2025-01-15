@@ -1,5 +1,5 @@
 /*
- * Copyright 2022-2023 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2022-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -481,7 +481,9 @@ OSSL_QUIC_TX_PACKETISER *ossl_quic_tx_packetiser_new(const OSSL_QUIC_TX_PACKETIS
                              get_sstream_by_id, txp,
                              on_regen_notify, txp,
                              on_confirm_notify, txp,
-                             on_sstream_updated, txp)) {
+                             on_sstream_updated, txp,
+                             args->get_qlog_cb,
+                             args->get_qlog_cb_arg)) {
         OPENSSL_free(txp);
         return NULL;
     }
@@ -623,6 +625,14 @@ void ossl_quic_tx_packetiser_set_ack_tx_cb(OSSL_QUIC_TX_PACKETISER *txp,
 {
     txp->ack_tx_cb      = cb;
     txp->ack_tx_cb_arg  = cb_arg;
+}
+
+void ossl_quic_tx_packetiser_set_qlog_cb(OSSL_QUIC_TX_PACKETISER *txp,
+                                         QLOG *(*get_qlog_cb)(void *arg),
+                                         void *get_qlog_cb_arg)
+{
+    ossl_quic_fifd_set_qlog_cb(&txp->fifd, get_qlog_cb, get_qlog_cb_arg);
+
 }
 
 int ossl_quic_tx_packetiser_discard_enc_level(OSSL_QUIC_TX_PACKETISER *txp,
@@ -990,51 +1000,51 @@ static const struct archetype_data archetypes[QUIC_ENC_LEVEL_NUM][TX_PACKETISER_
             /*bypass_cc                       =*/ 1,
         },
     },
-    /* EL 1(HANDSHAKE) */
+    /* EL 1(0RTT) */
     {
-        /* EL 1(HANDSHAKE) - Archetype 0(NORMAL) */
+        /* EL 1(0RTT) - Archetype 0(NORMAL) */
         {
-            /*allow_ack                       =*/ 1,
+            /*allow_ack                       =*/ 0,
             /*allow_ping                      =*/ 1,
-            /*allow_crypto                    =*/ 1,
+            /*allow_crypto                    =*/ 0,
             /*allow_handshake_done            =*/ 0,
             /*allow_path_challenge            =*/ 0,
             /*allow_path_response             =*/ 0,
-            /*allow_new_conn_id               =*/ 0,
-            /*allow_retire_conn_id            =*/ 0,
-            /*allow_stream_rel                =*/ 0,
-            /*allow_conn_fc                   =*/ 0,
+            /*allow_new_conn_id               =*/ 1,
+            /*allow_retire_conn_id            =*/ 1,
+            /*allow_stream_rel                =*/ 1,
+            /*allow_conn_fc                   =*/ 1,
             /*allow_conn_close                =*/ 1,
             /*allow_cfq_other                 =*/ 0,
             /*allow_new_token                 =*/ 0,
-            /*allow_force_ack_eliciting       =*/ 1,
+            /*allow_force_ack_eliciting       =*/ 0,
             /*allow_padding                   =*/ 1,
             /*require_ack_eliciting           =*/ 0,
             /*bypass_cc                       =*/ 0,
         },
-        /* EL 1(HANDSHAKE) - Archetype 1(PROBE) */
+        /* EL 1(0RTT) - Archetype 1(PROBE) */
         {
-            /*allow_ack                       =*/ 1,
+            /*allow_ack                       =*/ 0,
             /*allow_ping                      =*/ 1,
-            /*allow_crypto                    =*/ 1,
+            /*allow_crypto                    =*/ 0,
             /*allow_handshake_done            =*/ 0,
             /*allow_path_challenge            =*/ 0,
             /*allow_path_response             =*/ 0,
-            /*allow_new_conn_id               =*/ 0,
-            /*allow_retire_conn_id            =*/ 0,
-            /*allow_stream_rel                =*/ 0,
-            /*allow_conn_fc                   =*/ 0,
+            /*allow_new_conn_id               =*/ 1,
+            /*allow_retire_conn_id            =*/ 1,
+            /*allow_stream_rel                =*/ 1,
+            /*allow_conn_fc                   =*/ 1,
             /*allow_conn_close                =*/ 1,
             /*allow_cfq_other                 =*/ 0,
             /*allow_new_token                 =*/ 0,
-            /*allow_force_ack_eliciting       =*/ 1,
+            /*allow_force_ack_eliciting       =*/ 0,
             /*allow_padding                   =*/ 1,
             /*require_ack_eliciting           =*/ 1,
             /*bypass_cc                       =*/ 1,
         },
-        /* EL 1(HANDSHAKE) - Archetype 2(ACK_ONLY) */
+        /* EL 1(0RTT) - Archetype 2(ACK_ONLY) */
         {
-            /*allow_ack                       =*/ 1,
+            /*allow_ack                       =*/ 0,
             /*allow_ping                      =*/ 0,
             /*allow_crypto                    =*/ 0,
             /*allow_handshake_done            =*/ 0,
@@ -1047,57 +1057,57 @@ static const struct archetype_data archetypes[QUIC_ENC_LEVEL_NUM][TX_PACKETISER_
             /*allow_conn_close                =*/ 0,
             /*allow_cfq_other                 =*/ 0,
             /*allow_new_token                 =*/ 0,
-            /*allow_force_ack_eliciting       =*/ 1,
+            /*allow_force_ack_eliciting       =*/ 0,
             /*allow_padding                   =*/ 0,
             /*require_ack_eliciting           =*/ 0,
             /*bypass_cc                       =*/ 1,
         },
     },
-    /* EL 2(0RTT) */
+    /* EL (HANDSHAKE) */
     {
-        /* EL 2(0RTT) - Archetype 0(NORMAL) */
+        /* EL 2(HANDSHAKE) - Archetype 0(NORMAL) */
         {
-            /*allow_ack                       =*/ 0,
+            /*allow_ack                       =*/ 1,
             /*allow_ping                      =*/ 1,
-            /*allow_crypto                    =*/ 0,
+            /*allow_crypto                    =*/ 1,
             /*allow_handshake_done            =*/ 0,
             /*allow_path_challenge            =*/ 0,
             /*allow_path_response             =*/ 0,
-            /*allow_new_conn_id               =*/ 1,
-            /*allow_retire_conn_id            =*/ 1,
-            /*allow_stream_rel                =*/ 1,
-            /*allow_conn_fc                   =*/ 1,
+            /*allow_new_conn_id               =*/ 0,
+            /*allow_retire_conn_id            =*/ 0,
+            /*allow_stream_rel                =*/ 0,
+            /*allow_conn_fc                   =*/ 0,
             /*allow_conn_close                =*/ 1,
             /*allow_cfq_other                 =*/ 0,
             /*allow_new_token                 =*/ 0,
-            /*allow_force_ack_eliciting       =*/ 0,
+            /*allow_force_ack_eliciting       =*/ 1,
             /*allow_padding                   =*/ 1,
             /*require_ack_eliciting           =*/ 0,
             /*bypass_cc                       =*/ 0,
         },
-        /* EL 2(0RTT) - Archetype 1(PROBE) */
+        /* EL 2(HANDSHAKE) - Archetype 1(PROBE) */
         {
-            /*allow_ack                       =*/ 0,
+            /*allow_ack                       =*/ 1,
             /*allow_ping                      =*/ 1,
-            /*allow_crypto                    =*/ 0,
+            /*allow_crypto                    =*/ 1,
             /*allow_handshake_done            =*/ 0,
             /*allow_path_challenge            =*/ 0,
             /*allow_path_response             =*/ 0,
-            /*allow_new_conn_id               =*/ 1,
-            /*allow_retire_conn_id            =*/ 1,
-            /*allow_stream_rel                =*/ 1,
-            /*allow_conn_fc                   =*/ 1,
+            /*allow_new_conn_id               =*/ 0,
+            /*allow_retire_conn_id            =*/ 0,
+            /*allow_stream_rel                =*/ 0,
+            /*allow_conn_fc                   =*/ 0,
             /*allow_conn_close                =*/ 1,
             /*allow_cfq_other                 =*/ 0,
             /*allow_new_token                 =*/ 0,
-            /*allow_force_ack_eliciting       =*/ 0,
+            /*allow_force_ack_eliciting       =*/ 1,
             /*allow_padding                   =*/ 1,
             /*require_ack_eliciting           =*/ 1,
             /*bypass_cc                       =*/ 1,
         },
-        /* EL 2(0RTT) - Archetype 2(ACK_ONLY) */
+        /* EL 2(HANDSHAKE) - Archetype 2(ACK_ONLY) */
         {
-            /*allow_ack                       =*/ 0,
+            /*allow_ack                       =*/ 1,
             /*allow_ping                      =*/ 0,
             /*allow_crypto                    =*/ 0,
             /*allow_handshake_done            =*/ 0,
@@ -1110,7 +1120,7 @@ static const struct archetype_data archetypes[QUIC_ENC_LEVEL_NUM][TX_PACKETISER_
             /*allow_conn_close                =*/ 0,
             /*allow_cfq_other                 =*/ 0,
             /*allow_new_token                 =*/ 0,
-            /*allow_force_ack_eliciting       =*/ 0,
+            /*allow_force_ack_eliciting       =*/ 1,
             /*allow_padding                   =*/ 0,
             /*require_ack_eliciting           =*/ 0,
             /*bypass_cc                       =*/ 1,
@@ -1590,10 +1600,21 @@ static void on_regen_notify(uint64_t frame_type, uint64_t stream_id,
     }
 }
 
+static int txp_need_ping(OSSL_QUIC_TX_PACKETISER *txp,
+                         uint32_t pn_space,
+                         const struct archetype_data *adata)
+{
+    return adata->allow_ping
+        && (adata->require_ack_eliciting
+            || (txp->force_ack_eliciting & (1UL << pn_space)) != 0);
+}
+
 static int txp_pkt_init(struct txp_pkt *pkt, OSSL_QUIC_TX_PACKETISER *txp,
                         uint32_t enc_level, uint32_t archetype,
                         size_t running_total)
 {
+    uint32_t pn_space = ossl_quic_enc_level_to_pn_space(enc_level);
+
     if (!txp_determine_geometry(txp, archetype, enc_level,
                                 running_total, &pkt->phdr, &pkt->geom))
         return 0;
@@ -1604,7 +1625,7 @@ static int txp_pkt_init(struct txp_pkt *pkt, OSSL_QUIC_TX_PACKETISER *txp,
      */
     if (!tx_helper_init(&pkt->h, txp, enc_level,
                         pkt->geom.cmppl,
-                        pkt->geom.adata.require_ack_eliciting ? 1 : 0))
+                        txp_need_ping(txp, pn_space, &pkt->geom.adata) ? 1 : 0))
         return 0;
 
     pkt->h_valid            = 1;
@@ -1872,7 +1893,7 @@ static int txp_generate_pre_token(OSSL_QUIC_TX_PACKETISER *txp,
             pf = &f;
             pf->is_app      = 0;
             pf->frame_type  = 0;
-            pf->error_code  = QUIC_ERR_APPLICATION_ERROR;
+            pf->error_code  = OSSL_QUIC_ERR_APPLICATION_ERROR;
             pf->reason      = NULL;
             pf->reason_len  = 0;
         }
@@ -2111,7 +2132,8 @@ static int txp_plan_stream_chunk(OSSL_QUIC_TX_PACKETISER *txp,
                                  QUIC_SSTREAM *sstream,
                                  QUIC_TXFC *stream_txfc,
                                  size_t skip,
-                                 struct chunk_info *chunk)
+                                 struct chunk_info *chunk,
+                                 uint64_t consumed)
 {
     uint64_t fc_credit, fc_swm, fc_limit;
 
@@ -2130,7 +2152,7 @@ static int txp_plan_stream_chunk(OSSL_QUIC_TX_PACKETISER *txp,
     chunk->orig_len = chunk->shdr.len;
 
     /* Clamp according to connection and stream-level TXFC. */
-    fc_credit   = ossl_quic_txfc_get_credit(stream_txfc);
+    fc_credit   = ossl_quic_txfc_get_credit(stream_txfc, consumed);
     fc_swm      = ossl_quic_txfc_get_swm(stream_txfc);
     fc_limit    = fc_swm + fc_credit;
 
@@ -2166,7 +2188,8 @@ static int txp_generate_stream_frames(OSSL_QUIC_TX_PACKETISER *txp,
                                       QUIC_STREAM *next_stream,
                                       int *have_ack_eliciting,
                                       int *packet_full,
-                                      uint64_t *new_credit_consumed)
+                                      uint64_t *new_credit_consumed,
+                                      uint64_t conn_consumed)
 {
     int rc = 0;
     struct chunk_info chunks[2] = {0};
@@ -2194,7 +2217,8 @@ static int txp_generate_stream_frames(OSSL_QUIC_TX_PACKETISER *txp,
      * determining when we can use an implicit length in a STREAM frame.
      */
     for (i = 0; i < 2; ++i) {
-        if (!txp_plan_stream_chunk(txp, h, sstream, stream_txfc, i, &chunks[i]))
+        if (!txp_plan_stream_chunk(txp, h, sstream, stream_txfc, i, &chunks[i],
+                                   conn_consumed))
             goto err;
 
         if (i == 0 && !chunks[i].valid) {
@@ -2202,6 +2226,7 @@ static int txp_generate_stream_frames(OSSL_QUIC_TX_PACKETISER *txp,
             rc = 1;
             goto err;
         }
+        chunks[i].shdr.stream_id = id;
     }
 
     for (i = 0;; ++i) {
@@ -2232,7 +2257,7 @@ static int txp_generate_stream_frames(OSSL_QUIC_TX_PACKETISER *txp,
         if (i > 0)
             /* Load next chunk for lookahead. */
             if (!txp_plan_stream_chunk(txp, h, sstream, stream_txfc, i + 1,
-                                       &chunks[(i + 1) % 2]))
+                                       &chunks[(i + 1) % 2], conn_consumed))
                 goto err;
 
         /*
@@ -2315,7 +2340,6 @@ static int txp_generate_stream_frames(OSSL_QUIC_TX_PACKETISER *txp,
         if (wpkt == NULL)
             goto err; /* alloc error */
 
-        shdr->stream_id = id;
         if (!ossl_assert(ossl_quic_wire_encode_frame_stream_hdr(wpkt, shdr))) {
             /* (Should not be possible.) */
             tx_helper_rollback(h);
@@ -2382,6 +2406,7 @@ static int txp_generate_stream_related(OSSL_QUIC_TX_PACKETISER *txp,
     uint64_t cwm;
     QUIC_STREAM *stream, *snext;
     struct tx_helper *h = &pkt->h;
+    uint64_t conn_consumed = 0;
 
     for (ossl_quic_stream_iter_init(&it, txp->args.qsm, 1);
          it.stream != NULL;) {
@@ -2517,11 +2542,13 @@ static int txp_generate_stream_related(OSSL_QUIC_TX_PACKETISER *txp,
                                             snext,
                                             have_ack_eliciting,
                                             &packet_full,
-                                            &stream->txp_txfc_new_credit_consumed)) {
+                                            &stream->txp_txfc_new_credit_consumed,
+                                            conn_consumed)) {
                 /* Fatal error (allocation, etc.) */
                 txp_enlink_tmp(tmp_head, stream);
                 return 0;
             }
+            conn_consumed += stream->txp_txfc_new_credit_consumed;
 
             if (packet_full) {
                 txp_enlink_tmp(tmp_head, stream);
@@ -2766,11 +2793,10 @@ static int txp_generate_for_el(OSSL_QUIC_TX_PACKETISER *txp,
     /* PING */
     tx_helper_unrestrict(h);
 
-    if ((a.require_ack_eliciting
-         || (txp->force_ack_eliciting & (1UL << pn_space)) != 0)
-        && !have_ack_eliciting && a.allow_ping) {
+    if (!have_ack_eliciting && txp_need_ping(txp, pn_space, &a)) {
         WPACKET *wpkt;
 
+        assert(h->reserve > 0);
         wpkt = tx_helper_begin(h);
         if (wpkt == NULL)
             goto fatal_err;
@@ -2805,6 +2831,7 @@ static int txp_generate_for_el(OSSL_QUIC_TX_PACKETISER *txp,
     tpkt->ackm_pkt.is_pto_probe     = 0;
     tpkt->ackm_pkt.is_mtu_probe     = 0;
     tpkt->ackm_pkt.time             = txp->args.now(txp->args.now_arg);
+    tpkt->pkt_type                  = pkt->phdr.type;
 
     /* Done. */
     return rc;

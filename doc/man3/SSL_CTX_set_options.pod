@@ -24,6 +24,7 @@ SSL_get_secure_renegotiation_support - manipulate SSL options
 =head1 DESCRIPTION
 
 SSL_CTX_set_options() adds the options set via bit-mask in B<options> to B<ctx>.
+B<ctx> B<MUST NOT> be NULL.
 Options already set before are not cleared!
 
 SSL_set_options() adds the options set via bit-mask in B<options> to B<ssl>.
@@ -70,7 +71,7 @@ CSP 3.x.
 
 =item SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS
 
-Disables a countermeasure against a SSL 3.0/TLS 1.0 protocol
+Disables a countermeasure against an SSL 3.0/TLS 1.0 protocol
 vulnerability affecting CBC ciphers, which cannot be handled by some
 broken SSL implementations.  This option has no effect for connections
 using other ciphers.
@@ -109,6 +110,12 @@ this option to enable it.
 
 In TLSv1.3 allow a non-(ec)dhe based key exchange mode on resumption. This means
 that there will be no forward secrecy for the resumed session.
+
+=item SSL_OP_PREFER_NO_DHE_KEX
+
+In TLSv1.3, on resumption let the server prefer a non-(ec)dhe based key
+exchange mode over an (ec)dhe based one. Ignored without B<SSL_OP_ALLOW_NO_DHE_KEX>
+being set as well. Always ignored on the client.
 
 =item SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION
 
@@ -250,8 +257,12 @@ and compressed certificates will not be accepted from the peer.
 
 =item SSL_OP_NO_COMPRESSION
 
-Do not use compression even if it is supported. This option is set by default.
-To switch it off use SSL_clear_options().
+Do not use TLS record compression even if it is supported. This option is set by
+default. To switch it off use SSL_clear_options(). Note that TLS record
+compression is not recommended and is not available at security level 2 or
+above. From OpenSSL 3.2 the default security level is 2, so clearing this option
+will have no effect without also changing the default security level. See
+L<SSL_CTX_set_security_level(3)>.
 
 =item SSL_OP_NO_ENCRYPT_THEN_MAC
 
@@ -346,7 +357,7 @@ Disable version rollback attack detection.
 During the client key exchange, the client must send the same information
 about acceptable SSL/TLS protocol levels as during the first hello. Some
 clients violate this rule by adapting to the server's answer. (Example:
-the client sends a SSLv2 hello and accepts up to SSLv3.1=TLSv1, the server
+the client sends an SSLv2 hello and accepts up to SSLv3.1=TLSv1, the server
 only understands up to SSLv3. In this case the client must still use the
 same SSLv3.1=TLSv1 announcement. Some clients step down to SSLv3 with respect
 to the server's answer and violate the version rollback protection.)
